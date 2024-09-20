@@ -95,6 +95,13 @@
                 <artifactId>tinkar-core</artifactId>
                 <version>${tinkar-core.version}</version>
             </dependency>
+            
+            <dependency>
+                <groupId>dev.ikm.tinkar.ext.owl</groupId>
+                <artifactId>owl-extension</artifactId>
+                <version>${tinkar-core.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>dev.ikm.jpms</groupId>
                 <artifactId>eclipse-collections-api</artifactId>

@@ -20,10 +20,14 @@ import dev.ikm.tinkar.common.id.PublicId;
 import dev.ikm.tinkar.common.id.PublicIds;
 import dev.ikm.tinkar.common.service.PrimitiveData;
 import dev.ikm.tinkar.common.util.uuid.UuidT5Generator;
+import dev.ikm.tinkar.common.util.uuid.UuidUtil;
 import dev.ikm.tinkar.composer.Composer;
 import dev.ikm.tinkar.composer.Session;
 import dev.ikm.tinkar.composer.assembler.ConceptAssembler;
-import dev.ikm.tinkar.composer.template.*;
+import dev.ikm.tinkar.composer.template.Definition;
+import dev.ikm.tinkar.composer.template.FullyQualifiedName;
+import dev.ikm.tinkar.composer.template.Identifier;
+import dev.ikm.tinkar.composer.template.Synonym;
 import dev.ikm.tinkar.coordinate.stamp.*;
 import dev.ikm.tinkar.coordinate.stamp.calculator.Latest;
 import dev.ikm.tinkar.entity.*;
@@ -33,6 +37,7 @@ import dev.ikm.tinkar.entity.graph.adaptor.axiom.LogicalExpression;
 import dev.ikm.tinkar.entity.graph.isomorphic.IsomorphicResults;
 import dev.ikm.tinkar.entity.graph.isomorphic.IsomorphicResultsLeafHash;
 import dev.ikm.tinkar.entity.transaction.Transaction;
+import dev.ikm.tinkar.ext.lang.owl.Rf2OwlToLogicAxiomTransformer;
 import dev.ikm.tinkar.ext.lang.owl.SctOwlUtilities;
 import dev.ikm.tinkar.starterdata.StarterData;
 import dev.ikm.tinkar.starterdata.UUIDUtility;
@@ -110,6 +115,7 @@ public class LoincStarterData {
     private EntityProxy.Concept author = TinkarTerm.USER;
     private EntityProxy.Concept module = TinkarTerm.PRIMORDIAL_MODULE;
     private final EntityProxy.Concept path = TinkarTerm.PRIMORDIAL_PATH;
+    private final EntityProxy.Concept LOINC_CODE_SYSTEM = EntityProxy.Concept.make("LOINC Number", UuidUtil.fromSNOMED("705114005"));
 
     private final HashMap<String, EntityProxy.Concept> fqnToConceptHashMap = new HashMap<>();
 
@@ -171,6 +177,7 @@ public class LoincStarterData {
         session = COMPOSER_SESSION_MANAGER.open(status, time, TinkarTerm.USER, module, path);
 
         session.compose((ConceptAssembler conceptAssembler) -> conceptAssembler
+                .concept(author)
                 .attach((FullyQualifiedName fqn) -> fqn
                         .language(ENGLISH_LANGUAGE)
                         .text("LOINC_AUTHOR")
@@ -220,9 +227,9 @@ public class LoincStarterData {
     }
 
     public void processLoincConceptDataFile() throws IOException {
-
-        if (loincConceptFile == null)
+        if (loincConceptFile == null) {
             return;
+        }
 
         try (Stream<String> lines = Files.lines(loincConceptFile.toPath())) {
             lines.skip(1) //skip first line, i.e. header line
@@ -252,8 +259,7 @@ public class LoincStarterData {
                                         .caseSignificance(CASE_SENSITIVE_EVALUATION))
                                 .attach((Identifier identifier) -> identifier
                                         .identifier(conceptID)
-                                        .source(newConcept))
-
+                                        .source(LOINC_CODE_SYSTEM))
                         );
 
                         fqnToConceptHashMap.put(conceptID, newConcept);
@@ -294,7 +300,8 @@ public class LoincStarterData {
                                                 .caseSignificance(CASE_SENSITIVE_EVALUATION))
                                         .attach((Identifier identifier) -> identifier
                                                 .identifier(conceptID)
-                                                .source(newConcept)));
+                                                .source(LOINC_CODE_SYSTEM))
+                        );
 
                         fqnToConceptHashMap.put(conceptID, newConcept);
 
@@ -304,6 +311,8 @@ public class LoincStarterData {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        runAxiomSyntaxTransformer();
 
         stopIngest();
         PrimitiveData.start();
@@ -319,13 +328,13 @@ public class LoincStarterData {
             lines.skip(1) //skip first line, i.e. header line
                     .map(row -> row.split(REGEX_LINEDATA, -1))
                     .filter(data -> {
-                                String cleanString = fixString(data[1]);
-                                return partTypeNames.contains(fixString(cleanString));
-                            }
-                    )
+                        String cleanString = fixString(data[1]);
+                        return partTypeNames.contains(fixString(cleanString));
+                    })
                     .forEach(data -> {
                         // LOG.info(String.format("%s | %s | %s | %s | %s",data[0], data[1],data[2],data[3],data[4]));
-                        EntityProxy.Concept newConcept = EntityProxy.Concept.make(fixString(data[PART_SYNOMYM_INDEX]), UUID.nameUUIDFromBytes(fixString(data[CONCEPT_INDEX]).getBytes()));
+                        String conceptID = fixString(data[CONCEPT_INDEX]);
+                        EntityProxy.Concept newConcept = EntityProxy.Concept.make(fixString(data[PART_SYNOMYM_INDEX]),  UUID.nameUUIDFromBytes(conceptID.getBytes()));
 
                         session.compose((ConceptAssembler conceptAssembler) -> conceptAssembler
                                 .attach((FullyQualifiedName fqn) -> fqn
@@ -334,7 +343,7 @@ public class LoincStarterData {
                                         .caseSignificance(DESCRIPTION_NOT_CASE_SENSITIVE))
                                 .attach((Synonym syn) -> syn
                                         .language(ENGLISH_LANGUAGE)
-                                        .text( fixString(data[PART_SYNOMYM_INDEX]))
+                                        .text(fixString(data[PART_SYNOMYM_INDEX]))
                                         .caseSignificance(DESCRIPTION_NOT_CASE_SENSITIVE))
                                 .attach((Definition defn) -> defn
                                         .language(ENGLISH_LANGUAGE)
@@ -342,9 +351,10 @@ public class LoincStarterData {
                                         .caseSignificance(CASE_SENSITIVE_EVALUATION))
                                 .attach((Identifier identifier) -> identifier
                                         .identifier(fixString(data[PART_SYNOMYM_INDEX]))
-                                        .source(newConcept)));
+                                        .source(LOINC_CODE_SYSTEM))
+                        );
 
-                        fqnToConceptHashMap.put(fixString(data[PART_FQN_INDEX]), newConcept);
+//                        fqnToConceptHashMap.put(fixString(data[PART_FQN_INDEX]), newConcept);
                         fqnToConceptHashMap.put(fixString(data[CONCEPT_INDEX]), newConcept);
 
                     });
@@ -371,8 +381,9 @@ public class LoincStarterData {
 
                         String synonym = getSynonym(data);
                         String definition = getDefinition(data);
+                        String conceptID = fixString(data[CONCEPT_INDEX]);
 
-                        EntityProxy.Concept newConcept = EntityProxy.Concept.make(data[CONCEPT_INDEX], UUID.nameUUIDFromBytes(data[CONCEPT_INDEX].getBytes()));
+                        EntityProxy.Concept newConcept = EntityProxy.Concept.make(conceptID,  UUID.nameUUIDFromBytes(conceptID.getBytes()));
 
                         session.compose((ConceptAssembler conceptAssembler) -> conceptAssembler
                                 .attach((FullyQualifiedName fqn) -> fqn
@@ -389,7 +400,8 @@ public class LoincStarterData {
                                         .caseSignificance(CASE_SENSITIVE_EVALUATION))
                                 .attach((Identifier identifier) -> identifier
                                         .identifier(data[CONCEPT_INDEX])
-                                        .source(newConcept)));
+                                        .source(LOINC_CODE_SYSTEM))
+                        );
 
                         fqnToConceptHashMap.put(data[CONCEPT_INDEX], newConcept);
 
@@ -448,6 +460,7 @@ public class LoincStarterData {
         addNavigationAndDefinitionToDeprecatedMainLoincConcepts(starterData);
 
         starterData.build(); //Natively writing data to spined array
+        runAxiomSyntaxTransformer();
         //exportStarterData(); //exports starter data to pb.zip
         starterData.shutdown();
 
@@ -466,12 +479,6 @@ public class LoincStarterData {
 
                         EntityProxy.Concept newConcept = fqnToConceptHashMap.get(fixString(data[CONCEPT_INDEX]));
 
-                        starterData.concept(newConcept)
-                                .identifier(TinkarTerm.UNIVERSALLY_UNIQUE_IDENTIFIER, data[CONCEPT_INDEX])
-                                //TODO Doing the below will cause the reasoner to break
-                                //.statedDefinition(Arrays.asList(fqnToConceptHashMap.get(fixString(data[CLASS_INDEX]))))
-                                .build();
-
                         owlString.append("EquivalentClasses( \n");
                         owlString.append(":[" + newConcept.publicId().asUuidArray()[0] + "] \n");
                         owlString.append("\tObjectIntersectionOf( ");
@@ -499,10 +506,18 @@ public class LoincStarterData {
                         owlString.append("\t"); // Close EquivalentClasses
 
                         //LOG.info(owlString.toString());
+                        StarterData.ConceptBuilder conceptBuilder = starterData.concept(newConcept);
+                        newConcept.asUuidList().forEach(uuid -> {
+                            conceptBuilder.identifier(UNIVERSALLY_UNIQUE_IDENTIFIER, uuid.toString());
+                        });
+                        conceptBuilder
+                                .identifier(LOINC_CODE_SYSTEM, fixString(data[CONCEPT_INDEX]))
+                                .axiomSyntax(owlString.toString())
+                                .build();
 
                         try {
                             int nid = newConcept.nid();
-                            reasonOWLexpression(owlString.toString(), nid);
+//                            reasonOWLexpression(owlString.toString(), nid);
                             addLoincClassSemanticPattern(newConcept, data[CLASSNAME_INDEX], data[CLASS_TYPE_INDEX], starterData);
                             addUUCMSemanticPattern(newConcept, data[UUCM_PATTERN_INDEX], starterData);
                             addLoincTestOrdObservationSemanticPattern(newConcept, data[ORDER_OBS_INDEX], starterData);
@@ -518,28 +533,19 @@ public class LoincStarterData {
     }
 
     private void addNavigationAndDefinitionToDeprecatedMainLoincConcepts(StarterData starterData) {
-
         try (Stream<String> lines = Files.lines(loincConceptFile.toPath())) {
             lines.skip(1) //skip first line, i.e. header line
                     .map(row -> row.split(REGEX_LINEDATA, -1))
                     .filter(data -> (String.valueOf(data[STATUS_INDEX]).toLowerCase().contains("deprecated")))
                     .forEach(data -> {
                         // LOG.info(String.format("%s | %s | %s | %s | %s",data[0], data[1],data[2],data[3],data[4]));
-                        StringBuilder owlString = new StringBuilder();
-
                         EntityProxy.Concept newConcept = fqnToConceptHashMap.get(fixString(data[CONCEPT_INDEX]));
 
-                        starterData.concept(newConcept)
-                                .identifier(TinkarTerm.UNIVERSALLY_UNIQUE_IDENTIFIER, data[CONCEPT_INDEX])
-                                //TODO Doing the below will cause the reasoner to break
-                                //.statedDefinition(Arrays.asList(fqnToConceptHashMap.get(fixString(data[CLASS_INDEX]))))
-                                .build();
-
+                        StringBuilder owlString = new StringBuilder();
                         owlString.append("EquivalentClasses( \n");
                         owlString.append(":[" + newConcept.publicId().asUuidArray()[0] + "] \n");
                         owlString.append("\tObjectIntersectionOf( ");
                         owlString.append(":[" + fqnToConceptHashMap.get(OBSERVABLE_ENTITY).publicId().asUuidArray()[0] + "] \n");
-
 
                         for (LOINC_AXES axis : LOINC_AXES.values()) {
                             EntityProxy.Concept loincAxisConcept = fqnToConceptHashMap.get(fixString(data[axis.value]));
@@ -562,10 +568,18 @@ public class LoincStarterData {
                         owlString.append("\t"); // Close EquivalentClasses
 
                         //LOG.info(owlString.toString());
+                        StarterData.ConceptBuilder conceptBuilder = starterData.concept(newConcept);
+                        newConcept.asUuidList().forEach(uuid -> {
+                            conceptBuilder.identifier(UNIVERSALLY_UNIQUE_IDENTIFIER, uuid.toString());
+                        });
+                        conceptBuilder
+                                .identifier(LOINC_CODE_SYSTEM, fixString(data[CONCEPT_INDEX]))
+                                .axiomSyntax(owlString.toString())
+                                .build();
 
                         try {
                             int nid = newConcept.nid();
-                            reasonOWLexpression(owlString.toString(), nid);
+//                            reasonOWLexpression(owlString.toString(), nid);
                             addLoincClassSemanticPattern(newConcept, data[CLASSNAME_INDEX], data[CLASS_TYPE_INDEX], starterData);
                             addLoincTestOrdObservationSemanticPattern(newConcept, data[ORDER_OBS_INDEX], starterData);
                             addUUCMSemanticPattern(newConcept, data[UUCM_PATTERN_INDEX], starterData);
@@ -584,7 +598,7 @@ public class LoincStarterData {
     private void reasonOWLexpression(String owlString, int nid) {
         try {
             LOG.info("Attempting to reason this Ontology: ");
-            LOG.info(owlString);
+            //LOG.info(owlString);
             LogicalExpression expression = SctOwlUtilities.sctToLogicalExpression(owlString, "");
             // LOG.info(expression.toString());
             Transaction transaction = new Transaction("LOINC concept " + nid);
@@ -595,17 +609,16 @@ public class LoincStarterData {
                     .moduleNids(IntIds.set.of(module.nid()))
                     .build().withStampPositionTime(Long.MAX_VALUE);
 
-            LOG.info("Processing Concept : " + EntityService.get().getEntityFast(nid).description());
+            //LOG.info("Processing Concept : " + EntityService.get().getEntityFast(nid).description());
             addLogicalExpression(transaction, nid,
                     expression,
                     System.currentTimeMillis(),
                     stampCoordinateRecord);
 
-
+            transaction.commit();
         } catch (IOException e) {
             LOG.error(e.getMessage());
             //severeErrors++;
-
         } catch (Exception e) {
             LOG.error(e.getMessage());
             //severeErrors++;
@@ -625,7 +638,6 @@ public class LoincStarterData {
                                       long time, StampCoordinateRecord stampCoordinate) throws Exception {
 
         // See if a semantic already exists in this pattern referencing this concept...
-
         int[] semanticNidsForComponentOfPattern = EntityService.get().semanticNidsForComponentOfPattern(conceptNid, destinationPatternNid);
         if (semanticNidsForComponentOfPattern.length > 0) {
             if (semanticNidsForComponentOfPattern.length != 1) {
@@ -650,7 +662,7 @@ public class LoincStarterData {
                 addNewVersion(transaction, logicalExpression, time, SemanticRecordBuilder.builder(existingSemantic));
             }
         } else {
-// Create UUID from seed and assign SemanticBuilder the value
+            // Create UUID from seed and assign SemanticBuilder the value
             UUID generartedSemanticUuid = UuidT5Generator.singleSemanticUuid(EntityService.get().getEntityFast(destinationPatternNid),
                     EntityService.get().getEntityFast(conceptNid));
 
@@ -673,7 +685,6 @@ public class LoincStarterData {
      * @param time
      * @param newSemanticBuilder
      */
-
     private void addNewVersion(Transaction transaction, LogicalExpression logicalExpression,
                                long time, SemanticRecordBuilder newSemanticBuilder) {
 
@@ -702,59 +713,53 @@ public class LoincStarterData {
     private void addNavigationAndDefinitionToPartsConcepts(StarterData starterData) {
         try (Stream<String> lines = Files.lines(loincPartCSVFile.toPath())) {
             lines.skip(1) //skip first line, i.e. header line
-                    .map(row -> row.split(REGEX_LINEDATA, -1)).filter(data -> {
-                                String cleanString = data[1];
-                                return partTypeNames.contains(fixString(cleanString));
-                            }
-                    )
-
+                    .map(row -> row.split(REGEX_LINEDATA, -1))
+                    .filter(data -> {
+                        String cleanString = data[1];
+                        return partTypeNames.contains(fixString(cleanString));
+                    })
                     .forEach(data -> {
 
                         String conceptIdentifier = fixString(data[CONCEPT_INDEX]);
                         EntityProxy.Concept newConcept = fqnToConceptHashMap.get(conceptIdentifier);
+                        StarterData.ConceptBuilder conceptBuilder = starterData
+                                .concept(newConcept)
+                                .identifier(fqnToConceptHashMap.get(LOINC_NUMBER), conceptIdentifier);
 
                         if (String.valueOf(data[PART_TYPE_INDEX]).toLowerCase().contains("component")) {
-                            starterData.concept(newConcept)
-                                    .identifier(fqnToConceptHashMap.get(LOINC_NUMBER), conceptIdentifier)
+                            conceptBuilder
                                     .statedDefinition(Collections.singletonList(fqnToConceptHashMap.get("Component")))
-                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Component")))
-                                    .build();
+                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Component")));
                         } else if (String.valueOf(data[PART_TYPE_INDEX]).toLowerCase().contains("method")) {
-                            starterData.concept(newConcept)
+                            conceptBuilder
                                     .identifier(fqnToConceptHashMap.get(LOINC_NUMBER), conceptIdentifier)
                                     .statedDefinition(Collections.singletonList(fqnToConceptHashMap.get("Method")))
-                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Method")))
-                                    .build();
+                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Method")));
                         } else if (String.valueOf(data[PART_TYPE_INDEX]).toLowerCase().contains("property")) {
-                            starterData.concept(newConcept)
+                            conceptBuilder
                                     .identifier(fqnToConceptHashMap.get(LOINC_NUMBER), conceptIdentifier)
                                     .statedDefinition(Collections.singletonList(fqnToConceptHashMap.get("Property")))
-                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Property")))
-                                    .build();
+                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Property")));
                         } else if (String.valueOf(data[PART_TYPE_INDEX]).toLowerCase().contains("scale")) {
-                            starterData.concept(newConcept)
+                            conceptBuilder
                                     .identifier(fqnToConceptHashMap.get(LOINC_NUMBER), conceptIdentifier)
                                     .statedDefinition(Collections.singletonList(fqnToConceptHashMap.get("Scale")))
-                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Scale")))
-                                    .build();
+                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Scale")));
                         } else if (String.valueOf(data[PART_TYPE_INDEX]).toLowerCase().contains("time")) {
-                            starterData.concept(newConcept)
+                            conceptBuilder
                                     .identifier(fqnToConceptHashMap.get(LOINC_NUMBER), conceptIdentifier)
                                     .statedDefinition(Collections.singletonList(fqnToConceptHashMap.get("Time Aspect")))
-                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Time Aspect")))
-                                    .build();
+                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("Time Aspect")));
                         } else if (String.valueOf(data[PART_TYPE_INDEX]).toLowerCase().contains("system")) {
-                            starterData.concept(newConcept)
+                            conceptBuilder
                                     .identifier(fqnToConceptHashMap.get(LOINC_NUMBER), conceptIdentifier)
                                     .statedDefinition(Collections.singletonList(fqnToConceptHashMap.get("System")))
-                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("System")))
-                                    .build();
+                                    .statedNavigation(List.of(newConcept), Collections.singletonList(fqnToConceptHashMap.get("System")));
                         }
 
+                        conceptBuilder.build();
                         addStatusSemanticPatterns(newConcept, data[PART_STATUS_INDEX], starterData);
-
                     });
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -766,7 +771,7 @@ public class LoincStarterData {
                     .map(row -> row.split(REGEX_LINEDATA, -1))
                     .forEach(data -> {
 
-                        EntityProxy.Concept newConcept = fqnToConceptHashMap.get(data[CONCEPT_INDEX]);
+                        EntityProxy.Concept newConcept = fqnToConceptHashMap.get(fixString(data[CONCEPT_INDEX]));
 
                         if (String.valueOf(data[ORIGINS_INDEX]).trim().equals(PHENOMENON)) {
                             starterData.concept(newConcept)
@@ -794,10 +799,9 @@ public class LoincStarterData {
                                     .statedNavigation(List.of(newConcept), List.of(TinkarTerm.STATUS_VALUE))
                                     .build();
                         } else if (String.valueOf(data[ORIGINS_INDEX]).trim().equals(AUTHOR)) {
-                            EntityProxy.Concept baseAuthor = EntityProxy.Concept.make("Author", UUID.fromString("f7495b58-6630-3499-a44e-2052b5fcf06c")); // Author GUID from Tinkar root concept: "f7495b58-6630-3499-a44e-2052b5fcf06c"
                             starterData.concept(newConcept)
-                                    .statedDefinition(List.of(baseAuthor))
-                                    .statedNavigation(List.of(newConcept), List.of(baseAuthor))
+                                    .statedDefinition(List.of(TinkarTerm.USER))
+                                    .statedNavigation(List.of(newConcept), List.of(TinkarTerm.USER))
                                     .build();
                         } else if (String.valueOf(data[ORIGINS_INDEX]).trim().equals(MODULE)) {
                             starterData.concept(newConcept)
@@ -818,19 +822,12 @@ public class LoincStarterData {
     }
 
     private void addLoincClassSemanticPattern(EntityProxy.Concept loincConcept, String loincClass, String loincClassType, StarterData starterData) {
-
-        if (loincConcept == null) {
+        EntityProxy.Concept loincClassConcept = fqnToConceptHashMap.get(fixString(loincClass));
+        if (loincConcept == null || loincClassConcept == null) {
             return;
         }
 
         MutableList<Object> classPatternFields = Lists.mutable.empty();
-
-        EntityProxy.Concept loincClassConcept = fqnToConceptHashMap.get(fixString(loincClass));
-
-        if (loincClassConcept == null) {
-            return;
-        }
-
         //classPatternFields.add(loincClassConcept.nid());
         //classPatternFields.add(fixString(loincClassType));
 
@@ -850,18 +847,13 @@ public class LoincStarterData {
     }
 
     private void addUUCMSemanticPattern(EntityProxy.Concept loincConcept, String uucmPattern, StarterData starterData) {
-
-        if (loincConcept == null) {
+        String uucumPatternString = fixString(uucmPattern);
+        if (loincConcept == null || uucumPatternString.isEmpty() || uucumPatternString.isBlank()) {
             return;
         }
 
         MutableList<Object> classPatternFields = Lists.mutable.empty();
-
-        if (fixString(uucmPattern).isEmpty() || fixString(uucmPattern).isBlank()) {
-            return;
-        }
-
-        classPatternFields.add(fixString(uucmPattern));
+        classPatternFields.add(uucumPatternString);
 
         UUIDUtility uuidUtility = new UUIDUtility();
         PublicId patternPublicId = PublicIds.of(uuidUtility.createUUID(EXAMPLE_UCUM_UNITS_PATTERN));
@@ -878,17 +870,13 @@ public class LoincStarterData {
     }
 
     private void addStatusSemanticPatterns(EntityProxy.Concept loincPartConcept, String status, StarterData starterData) {
-
-        if (loincPartConcept == null) {
+        String statusString = fixString(status);
+        if (loincPartConcept == null || statusString.isEmpty() || statusString.isBlank()) {
             return;
         }
 
         MutableList<Object> classPatternFields = Lists.mutable.empty();
         String semanticPattern;
-
-        if (fixString(status).isEmpty() || fixString(status).isBlank()) {
-            return;
-        }
 
         if (status.toLowerCase().contains("active")) {
             semanticPattern = LOINC_TRIAL_STATUS_PATTERN;
@@ -944,14 +932,16 @@ public class LoincStarterData {
             UUIDUtility uuidUtility = new UUIDUtility();
             PublicId patternPublicId = PublicIds.of(uuidUtility.createUUID(pattern));
             int patternNid = EntityService.get().nidForPublicId(patternPublicId);
-            PublicId referencedComponentPublicID = loincConcept.publicId();
-            int referencedComponentNid = EntityService.get().nidForPublicId(referencedComponentPublicID);
-            PublicId semantic = PublicIds.singleSemanticId(patternPublicId, referencedComponentPublicID);
+
+//            PublicId referencedComponentPublicID = loincConcept.publicId();
+//            int referencedComponentNid = EntityService.get().nidForPublicId(referencedComponentPublicID);
+
+            PublicId semantic = PublicIds.singleSemanticId(patternPublicId, loincConcept.publicId());
             int semanticNid = EntityService.get().nidForPublicId(semantic);
             UUID primordialUUID = semantic.asUuidArray()[0];
             int stampNid = EntityService.get().nidForPublicId(starterData.getAuthoringSTAMP());
 
-            writeSemantic(semanticNid, primordialUUID, patternNid, referencedComponentNid, stampNid, classPatternFields);
+            writeSemantic(semanticNid, primordialUUID, patternNid, loincConcept.nid(), stampNid, classPatternFields);
         }
 
     }
@@ -1101,8 +1091,8 @@ public class LoincStarterData {
             lines.skip(1) //skip first line, i.e. header line
                     .map(row -> row.split(REGEX_LINEDATA, -1))
                     .forEach(data -> {
-
-                        EntityProxy.Concept newConcept = EntityProxy.Concept.make(data[CONCEPT_INDEX], UUID.nameUUIDFromBytes(data[CONCEPT_INDEX].getBytes()));
+                        String conceptID = fixString(data[CONCEPT_INDEX]);
+                        EntityProxy.Concept newConcept = EntityProxy.Concept.make(data[CONCEPT_INDEX], UUID.nameUUIDFromBytes(conceptID.getBytes()));
 
                         session.compose((ConceptAssembler conceptAssembler) -> conceptAssembler
                                 .attach((FullyQualifiedName fqn) -> fqn
@@ -1119,8 +1109,8 @@ public class LoincStarterData {
                                         .caseSignificance(CASE_SENSITIVE_EVALUATION))
                                 .attach((Identifier identifier) -> identifier
                                         .identifier(data[CONCEPT_INDEX])
-                                        .source(newConcept)));
-
+                                        .source(LOINC_CODE_SYSTEM))
+                        );
                     });
 
 
@@ -1133,7 +1123,7 @@ public class LoincStarterData {
 
 
     public void stopIngest() {
-        COMPOSER_SESSION_MANAGER.commitSession(session);
+        COMPOSER_SESSION_MANAGER.commitAllSessions();
         PrimitiveData.stop();
     }
 
@@ -1148,5 +1138,17 @@ public class LoincStarterData {
         return epochTime;
     }
 
+    private static void runAxiomSyntaxTransformer() {
+        System.out.println("########## Transforming OWL Axioms...");
+        Transaction owlTransformationTransaction = Transaction.make();
+        try {
+            new Rf2OwlToLogicAxiomTransformer(
+                    owlTransformationTransaction,
+                    TinkarTerm.OWL_AXIOM_SYNTAX_PATTERN,
+                    TinkarTerm.EL_PLUS_PLUS_STATED_AXIOMS_PATTERN).call();
+        } catch (Exception e){
+            throw new RuntimeException(e);
+        }
+    }
 
 }

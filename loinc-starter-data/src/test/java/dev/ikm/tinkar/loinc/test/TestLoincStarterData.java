@@ -40,14 +40,13 @@ public class TestLoincStarterData  {
     private static final Logger LOG = LoggerFactory.getLogger(TestLoincStarterData.class.getSimpleName());
 
     public static final Function<String, File> createFilePathInTarget = (pathName) -> new File("%s/target/%s".formatted(System.getProperty("user.dir"), pathName));
-    public static final File PB_STARTER_DATA = createFilePathInTarget.apply("../src/test/resources/tinkar-export-with-definitions-pb.zip");
+    public static final File PB_STARTER_DATA = createFilePathInTarget.apply("../src/test/resources/loinc-transformation-starter-data.pb.zip");
     public static final File DATASTORE = createFilePathInTarget.apply("generated-data/" + TestLoincStarterData.class.getSimpleName());
     public final Composer COMPOSER_SESSION_MANAGER = new Composer("LOINC Composer");
 
     public static LoincStarterData loincStarterData;
     @BeforeAll
     public void initialize()  {
-
         File loincStarterDataCSVfile  = new File(System.getProperty("user.dir") +"/src/main/resources/LOINC_Starter_Data.csv");
         File loincPartCSVfile  = new File(System.getProperty("user.dir") +"/src/main/resources/Part.csv");
         File loincConceptFile = new File(System.getProperty("user.dir") + "/src/main/resources/Loinc.csv");
@@ -63,8 +62,6 @@ public class TestLoincStarterData  {
         loincStarterData = new LoincStarterData(loincStarterDataCSVfile,loincPartCSVfile);
         loincStarterData.setDataStore(DATASTORE);
         loincStarterData.setLoincConceptFile(loincConceptFile);
-
-
     }
 
     @Test

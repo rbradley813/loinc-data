@@ -149,15 +149,13 @@
   </dependencies>
 </dependencyManagement>
   <dependencies>
-    <!-- <dependency>
+    <dependency>
       <groupId>dev.ikm.tinkar</groupId>
       <artifactId>starter-data-builder</artifactId>
-      <version>${starter-data-builder.version}</version>
-    </dependency> -->
+    </dependency>
     <dependency>
       <groupId>dev.ikm.tinkar</groupId>
       <artifactId>data-spinedarray-provider</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>${project.groupId}</groupId>
@@ -185,14 +183,13 @@
           <artifactId>common</artifactId>
           <scope>compile</scope>
       </dependency>
-    <!-- <dependency>
-      <groupId>dev.ikm.tinkar</groupId>
-      <artifactId>starter-data-builder</artifactId>
-      <version>${starter-data-builder.version}</version>
-    </dependency> -->
     <dependency>
       <groupId>dev.ikm.tinkar</groupId>
-      <artifactId>integration</artifactId>
+      <artifactId>starter-data-builder</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.ikm.tinkar.ext.owl</groupId>
+      <artifactId>owl-extension</artifactId>
     </dependency>
   </dependencies>
   <build>
