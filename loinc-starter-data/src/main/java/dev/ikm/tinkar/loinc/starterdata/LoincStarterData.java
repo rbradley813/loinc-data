@@ -191,17 +191,14 @@ public class LoincStarterData {
                         .text("Regenstrief Institute, Inc. Author - The entity responsible for publishing LOINC")
                         .caseSignificance(CASE_SENSITIVE_EVALUATION))
         );
-
         stopIngest();
         PrimitiveData.start();
         session = COMPOSER_SESSION_MANAGER.open(status, time, author, module, path);
 
         fqnToConceptHashMap.put(LOINC_AUTHOR, author);
-
     }
 
     public static void main(String[] args) throws IOException {
-
         if (args.length != 1 && !args[0].toLowerCase().endsWith(".csv"))
             throw new IllegalArgumentException("Please pass at least 1 argument. This argument should be the starterdata.csv file");
 
@@ -218,8 +215,6 @@ public class LoincStarterData {
         } else {
             throw new RuntimeException("Not all input files found");
         }
-
-
     }
 
     public void setLoincConceptFile(File loincConceptFile) {
@@ -264,8 +259,6 @@ public class LoincStarterData {
 
                         fqnToConceptHashMap.put(conceptID, newConcept);
                     });
-
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -304,10 +297,7 @@ public class LoincStarterData {
                         );
 
                         fqnToConceptHashMap.put(conceptID, newConcept);
-
                     });
-
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -317,11 +307,9 @@ public class LoincStarterData {
         stopIngest();
         PrimitiveData.start();
         session = COMPOSER_SESSION_MANAGER.open(State.ACTIVE, time, author, module, path);
-
     }
 
     public void processLoincPartCsvFile() throws IOException {
-
         processHeaderLine(loincPartCSVFile);
 
         try (Stream<String> lines = Files.lines(loincPartCSVFile.toPath())) {
@@ -356,14 +344,10 @@ public class LoincStarterData {
 
 //                        fqnToConceptHashMap.put(fixString(data[PART_FQN_INDEX]), newConcept);
                         fqnToConceptHashMap.put(fixString(data[CONCEPT_INDEX]), newConcept);
-
                     });
-
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     private static String fixString(String inputString) {
@@ -373,7 +357,6 @@ public class LoincStarterData {
     }
 
     public void processLoincStarterDataCSVFile() throws IOException {
-
         try (Stream<String> lines = Files.lines(loincStarterDataCSVfile.toPath())) {
             lines.skip(1) //skip first line, i.e. header line
                     .map(row -> row.split(REGEX_LINEDATA, -1))
@@ -408,14 +391,10 @@ public class LoincStarterData {
                     });
 
             processLoincPartCsvFile();
-
             processLoincConceptDataFile();
-
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
         //Stop the composer and release the lock on the database so StartData can use it.
         stopIngest();
 
@@ -427,7 +406,6 @@ public class LoincStarterData {
 
 
     private void addStatedDefinitionAndNavigation() {
-
         StarterData starterData = new StarterData(dataStore, uuidUtility)
                 .init()
                 .authoringSTAMP(
@@ -436,7 +414,6 @@ public class LoincStarterData {
                         author,
                         module,
                         path);
-
 
         addNavigationAndDefintionToStarterConcepts(starterData, uuidUtility);
 
@@ -463,12 +440,9 @@ public class LoincStarterData {
         runAxiomSyntaxTransformer();
         //exportStarterData(); //exports starter data to pb.zip
         starterData.shutdown();
-
-
     }
 
     private void addNavigationAndDefinitionToMainLoincConcepts(StarterData starterData) {
-
         try (Stream<String> lines = Files.lines(loincConceptFile.toPath())) {
             lines.skip(1) //skip first line, i.e. header line
                     .map(row -> row.split(REGEX_LINEDATA, -1))
@@ -483,7 +457,6 @@ public class LoincStarterData {
                         owlString.append(":[" + newConcept.publicId().asUuidArray()[0] + "] \n");
                         owlString.append("\tObjectIntersectionOf( ");
                         owlString.append(":[" + fqnToConceptHashMap.get(OBSERVABLE_ENTITY).publicId().asUuidArray()[0] + "] \n");
-
 
                         for (LOINC_AXES axis : LOINC_AXES.values()) {
                             EntityProxy.Concept loincAxisConcept = fqnToConceptHashMap.get(fixString(data[axis.value]));
@@ -524,9 +497,7 @@ public class LoincStarterData {
                         } catch (NullPointerException nullPointerException) {
                             LOG.error(nullPointerException.getMessage());
                         }
-
                     });
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -587,9 +558,7 @@ public class LoincStarterData {
                             LOG.error(nullPointerException.getMessage());
                             //severeErrors++;
                         }
-
                     });
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -719,7 +688,6 @@ public class LoincStarterData {
                         return partTypeNames.contains(fixString(cleanString));
                     })
                     .forEach(data -> {
-
                         String conceptIdentifier = fixString(data[CONCEPT_INDEX]);
                         EntityProxy.Concept newConcept = fqnToConceptHashMap.get(conceptIdentifier);
                         StarterData.ConceptBuilder conceptBuilder = starterData
@@ -810,12 +778,8 @@ public class LoincStarterData {
                                     .build();
                             module = newConcept;
                         }
-
                     });
-
-
             buildLoincPatterns(starterData, uuidUtility);
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -842,8 +806,6 @@ public class LoincStarterData {
         int stampNid = EntityService.get().nidForPublicId(starterData.getAuthoringSTAMP());
 
         writeSemantic(semanticNid, primordialUUID, patternNid, referencedComponentNid, stampNid, classPatternFields);
-
-
     }
 
     private void addUUCMSemanticPattern(EntityProxy.Concept loincConcept, String uucmPattern, StarterData starterData) {
@@ -866,7 +828,6 @@ public class LoincStarterData {
         int stampNid = EntityService.get().nidForPublicId(starterData.getAuthoringSTAMP());
 
         writeSemantic(semanticNid, primordialUUID, patternNid, referencedComponentNid, stampNid, classPatternFields);
-
     }
 
     private void addStatusSemanticPatterns(EntityProxy.Concept loincPartConcept, String status, StarterData starterData) {
@@ -897,15 +858,11 @@ public class LoincStarterData {
         int stampNid = EntityService.get().nidForPublicId(starterData.getAuthoringSTAMP());
 
         writeSemantic(semanticNid, primordialUUID, patternNid, referencedComponentNid, stampNid, classPatternFields);
-
     }
 
 
     private void addLoincTestOrdObservationSemanticPattern(EntityProxy.Concept loincConcept, String orderObsValue, StarterData starterData) {
-
-
         ArrayList<String> requiredPatterns = new ArrayList<>();
-
         if (loincConcept == null || orderObsValue == null || orderObsValue.isBlank() || orderObsValue.isEmpty()) {
             return;
         }
@@ -924,8 +881,6 @@ public class LoincStarterData {
         }
 
         MutableList<Object> classPatternFields = Lists.mutable.empty();
-
-
         //classPatternFields.add(loincClassConcept);
         //classPatternFields.add(loincClassType);
         for (String pattern : requiredPatterns) {
@@ -943,7 +898,6 @@ public class LoincStarterData {
 
             writeSemantic(semanticNid, primordialUUID, patternNid, loincConcept.nid(), stampNid, classPatternFields);
         }
-
     }
 
     private void writeSemantic(int semanticNid, UUID primordialUUID, int patternNid, int referencedComponentNid, int stampNid, MutableList<Object> lidrRecordFields) {
@@ -1070,7 +1024,6 @@ public class LoincStarterData {
         }
     }
 
-
     private void processHeaderLine(File datafile) throws IOException {
         try (Stream<String> headerLines = Files.lines(datafile.toPath())) {
             Optional<String> headerRow = headerLines.findFirst();
@@ -1112,13 +1065,9 @@ public class LoincStarterData {
                                         .source(LOINC_CODE_SYSTEM))
                         );
                     });
-
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-
     }
 
 
